@@ -1,0 +1,101 @@
+#include <WiFi.h>
+
+const char* ssid = "HR_HAMEED";
+const char* password = "87651234";
+
+WiFiServer server(80);
+
+String latestData = "NO DATA";
+
+void setup()
+{
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting");
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.println("WiFi Connected");
+
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
+  server.begin();
+}
+
+void loop()
+{
+  if (Serial.available())
+  {
+    String data = Serial.readStringUntil('\n');
+
+    Serial.print("DATA RECEIVED: ");
+    Serial.println(data);
+
+    latestData = data;
+  }
+
+  WiFiClient client = server.available();
+
+  if (client)
+  {
+    String request = client.readStringUntil('\r');
+    client.flush();
+
+    // endpoint for data
+    if (request.indexOf("/data") != -1)
+    {
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: text/plain");
+      client.println();
+      client.println(latestData);
+    }
+    else
+    {
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: text/html");
+      client.println();
+
+      client.println("<!DOCTYPE html>");
+      client.println("<html>");
+      client.println("<head>");
+      client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
+
+      client.println("<style>");
+      client.println("body{background:#111;color:white;font-family:Arial;text-align:center}");
+      client.println(".card{background:#222;padding:20px;margin:40px auto;width:300px;border-radius:10px}");
+      client.println(".value{font-size:30px;color:#00ff88}");
+      client.println("</style>");
+
+      client.println("</head>");
+      client.println("<body>");
+
+      client.println("<h1>RA6E2 Device Dashboard</h1>");
+
+      client.println("<div class='card'>");
+      client.println("<h2>Latest UART Data</h2>");
+      client.println("<div id='data' class='value'>Loading...</div>");
+      client.println("</div>");
+
+      client.println("<script>");
+      client.println("setInterval(function(){");
+      client.println("fetch('/data')");
+      client.println(".then(res=>res.text())");
+      client.println(".then(t=>{document.getElementById('data').innerText=t;});");
+      client.println("},2000);");
+      client.println("</script>");
+
+      client.println("</body>");
+      client.println("</html>");
+    }
+
+    client.stop();
+  }
+}
